@@ -3,6 +3,8 @@
 // file 'LICENSE.txt', which is part of this source code package.
 
 using System;
+using System.Reflection;
+using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
 #if WINRT
@@ -678,6 +680,29 @@ namespace Microsoft.Xna.Framework
 
         internal void DoInitialize()
         {
+            try
+			{
+				Console.Out.WriteLine("Attempting to patch...");
+                var patchfile = Environment.GetEnvironmentVariable("MONOGAME_PATCH");
+                if (patchfile.Length > 0) {
+                    var assembly = Assembly.LoadFrom(patchfile);
+                    foreach (var type in assembly.GetTypes()
+                        .Where(t => Attribute.IsDefined(t, typeof(ModEntryPointAttribute))))
+                    {
+                        MethodInfo method = type.GetMethod("Main");
+                        Console.Out.WriteLine("Attempting to use {0} (Main: {1})", type.ToString(), method.ToString());
+                        if (method != null)
+                        {
+                            method.Invoke(null, null);
+                        }
+                    }
+                }
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine("Failed to load Patch {0}", ex.Message);
+			}
+
             AssertNotDisposed();
             if (GraphicsDevice == null && graphicsDeviceManager != null)
                 _graphicsDeviceManager.CreateDevice();
