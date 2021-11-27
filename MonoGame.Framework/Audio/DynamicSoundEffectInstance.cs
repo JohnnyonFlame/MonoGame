@@ -125,15 +125,18 @@ namespace Microsoft.Xna.Framework.Audio
         {
             AssertNotDisposed();
 
-            if (_state != SoundState.Playing)
+            lock (FrameworkDispatcher.updateWorkerThread)
             {
-                // Ensure that the volume reflects master volume, which is done by the setter.
-                Volume = Volume;
+                if (_state != SoundState.Playing)
+                {
+                    // Ensure that the volume reflects master volume, which is done by the setter.
+                    Volume = Volume;
 
-                // Add the instance to the pool
-                if (!SoundEffectInstancePool.SoundsAvailable)
-                    throw new InstancePlayLimitException();
-                SoundEffectInstancePool.Remove(this);
+                    // Add the instance to the pool
+                    if (!SoundEffectInstancePool.SoundsAvailable)
+                        throw new InstancePlayLimitException();
+                    SoundEffectInstancePool.Remove(this);
+                }
 
                 PlatformPlay();
                 _state = SoundState.Playing;
@@ -160,18 +163,22 @@ namespace Microsoft.Xna.Framework.Audio
         {
             AssertNotDisposed();
 
-            if (_state != SoundState.Playing)
+            lock (FrameworkDispatcher.updateWorkerThread)
             {
-                Volume = Volume;
+                if (_state != SoundState.Playing)
+                {
+                    Volume = Volume;
 
-                // Add the instance to the pool
-                if (!SoundEffectInstancePool.SoundsAvailable)
-                    throw new InstancePlayLimitException();
-                SoundEffectInstancePool.Remove(this);
+                    // Add the instance to the pool
+                    if (!SoundEffectInstancePool.SoundsAvailable)
+                        throw new InstancePlayLimitException();
+                    SoundEffectInstancePool.Remove(this);
+                }
+
+                PlatformResume();
+
+                _state = SoundState.Playing;
             }
-
-            PlatformResume();
-            _state = SoundState.Playing;
         }
 
         /// <summary>
@@ -196,15 +203,17 @@ namespace Microsoft.Xna.Framework.Audio
         public override void Stop(bool immediate)
         {
             AssertNotDisposed();
-            
-            if (immediate)
+            lock (FrameworkDispatcher.updateWorkerThread)
             {
-                DynamicSoundEffectInstanceManager.RemoveInstance(this);
+                if (immediate)
+                {
+                    DynamicSoundEffectInstanceManager.RemoveInstance(this);
 
-                PlatformStop();
-                _state = SoundState.Stopped;
+                    PlatformStop();
+                    _state = SoundState.Stopped;
 
-                SoundEffectInstancePool.Add(this);
+                    SoundEffectInstancePool.Add(this);
+                }
             }
         }
 

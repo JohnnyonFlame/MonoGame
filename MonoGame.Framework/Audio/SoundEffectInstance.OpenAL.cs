@@ -3,6 +3,7 @@
 // file 'LICENSE.txt', which is part of this source code package.
 
 using System;
+using System.Runtime.InteropServices;
 
 #if MONOMAC && PLATFORM_MACOS_LEGACY
 using MonoMac.OpenAL;
@@ -34,10 +35,13 @@ namespace Microsoft.Xna.Framework.Audio
         float filterQ;
         float frequency;
         int pauseCount;
+        int[] buffers;
         
         internal OpenALSoundController controller;
         
         internal bool HasSourceId = false;
+
+        internal long currentBufferPosition;
 
 #region Initialization
 
@@ -114,7 +118,71 @@ namespace Microsoft.Xna.Framework.Audio
 
         private void PlatformPlay()
         {
+            if (_effect.SoundBufferStreamed == null)
+                PlayMemoryResident();
+            else
+                PlayStreamed();
+        }
 
+        const int MAX_BUFFERS = 5;
+        const long BUFFER_FILL_SZ = 16384;
+
+        private void PlayStreamed()
+        {
+            //TODO:: Setup Source
+            currentBufferPosition = 0;
+
+            SourceId = 0;
+            HasSourceId = false;
+            SourceId = controller.ReserveSource();
+            HasSourceId = true;
+            ALHelper.CheckError("Failed to reserve source.");
+
+            buffers = AL.GenBuffers(MAX_BUFFERS);
+            ALHelper.CheckError("Failed to reserve buffers to source.");
+
+            AL.Source(SourceId, ALSourcei.Buffer, 0);
+
+            foreach (var buffer in buffers) {
+                if (_effect.SoundBufferStreamed.alignment > 0) {
+                    AL.Bufferi (buffer, ALBufferi.UnpackBlockAlignmentSoft, _effect.SoundBufferStreamed.alignment);
+                    ALHelper.CheckError("Failed to set buffer block alignment.");
+                }
+            }
+
+            // Send the position, gain, looping, pitch, and distance model to the OpenAL driver.
+            if (!HasSourceId)
+				return;
+
+			// Distance Model
+			AL.DistanceModel (ALDistanceModel.InverseDistanceClamped);
+            ALHelper.CheckError("Failed set source distance.");
+			// Pan
+			AL.Source (SourceId, ALSource3f.Position, _pan, 0, 0.1f);
+            ALHelper.CheckError("Failed to set source pan.");
+			// Volume
+			AL.Source (SourceId, ALSourcef.Gain, _alVolume);
+            ALHelper.CheckError("Failed to set source volume.");
+			// Looping - unecessary for streamed data.
+			// AL.Source (SourceId, ALSourceb.Looping, IsLooped);
+            // ALHelper.CheckError("Failed to set source loop state.");
+			// Pitch
+			AL.Source (SourceId, ALSourcef.Pitch, XnaPitchToAlPitch(_pitch));
+            ALHelper.CheckError("Failed to set source pitch.");
+
+#if SUPPORTS_EFX
+            ApplyReverb ();
+            ApplyFilter ();
+#endif
+
+            PushIfNeeded(buffers);
+            AL.SourcePlay(SourceId);
+            
+            SoundState = SoundState.Playing;
+        }
+
+        private void PlayMemoryResident()
+        {
             SourceId = 0;
             HasSourceId = false;
             SourceId = controller.ReserveSource();
@@ -152,6 +220,88 @@ namespace Microsoft.Xna.Framework.Audio
 
 
             SoundState = SoundState.Playing;
+        }
+
+        public void PushIfNeeded()
+        {
+            if (State != SoundState.Playing || _effect.SoundBufferStreamed == null)
+                return;
+
+            int buffersProcessed = 0;
+            AL.GetSource(SourceId, ALGetSourcei.BuffersProcessed, out buffersProcessed);
+            ALHelper.CheckError("Failed to get processed buffer count.");
+            if (buffersProcessed <= 0)
+                return;
+
+            int[] buffers = AL.SourceUnqueueBuffers(SourceId, buffersProcessed);
+            ALHelper.CheckError("Failed to unqueue buffers.");
+
+            PushIfNeeded(buffers);
+        }
+
+        public void PushIfNeeded(int[] buffers)
+        {
+            if (_effect.SoundBufferStreamed == null)
+                return;
+
+            ref OALSoundBufferStreamed stream = ref _effect.SoundBufferStreamed;
+
+            int buffersQueued = 0;
+            AL.GetSource(SourceId, ALGetSourcei.BuffersQueued, out buffersQueued);
+            ALHelper.CheckError("Failed to get queued buffer count.");
+
+            //If we have at least two buffers left, come back later
+            if (buffersQueued > 2)
+                return;
+
+            if (buffersQueued == 0 && currentBufferPosition == stream.size && _looped == false) {
+                PlatformStop(true);
+                HasSourceId = false;
+            }
+
+            // Accesses to data must be made aligned to one "unpack unit" - these formulas calculate how big such unit is
+            // See: https://github.com/kcat/openal-soft/blob/5eb93f6c7437a7b08f500a2484f9734499f36976/al/buffer.cpp#L544
+            int align = 0;
+            if (stream.format == ALFormat.MonoMSADPCM || stream.format == ALFormat.StereoMSADPCM)
+            {
+                align = (int)stream.channels * ((stream.alignment-2)/2 + 7);
+            }
+            else
+            {
+                int bytesize = 
+                    (stream.format == ALFormat.Mono8 || stream.format == ALFormat.Stereo8) ? 1 :
+                    (stream.format == ALFormat.Mono16 || stream.format == ALFormat.Stereo16) ? 2 :
+                    4;
+
+                align = (int)stream.channels * bytesize * stream.alignment;
+            }
+
+            foreach (var buffer in buffers) {
+                long sz = BUFFER_FILL_SZ;
+                long left_in_stream = stream.size - currentBufferPosition;
+                
+                sz = (left_in_stream < sz) ? left_in_stream : sz;
+                sz = sz - (sz % align);
+
+                if (sz <= 0)
+                {
+                    if (!_looped)
+                        break;
+                    
+                    currentBufferPosition = 0;
+                    sz = (stream.size < BUFFER_FILL_SZ) ? stream.size : BUFFER_FILL_SZ;
+                    sz = sz - (sz % align);
+                }
+
+                // System.Console.WriteLine("sz: {0}, align: {1}, remainder: {2}", sz, align, sz%align);
+                AL.BufferData((uint)buffer, (int)stream.format, IntPtr.Add(stream.dataBuffer, (int)currentBufferPosition), (int)sz, stream.sampleRate);
+                ALHelper.CheckError("Failed to push data to buffer.");
+
+                AL.SourceQueueBuffer(SourceId, buffer);
+                ALHelper.CheckError("Failed to queue buffer.");
+
+                currentBufferPosition += sz;
+            }
         }
 
         private void PlatformResume()
@@ -199,6 +349,9 @@ namespace Microsoft.Xna.Framework.Audio
 #endif
                 AL.Source(SourceId, ALSourcei.Buffer, 0);
                 ALHelper.CheckError("Failed to free source from buffer.");
+
+                AL.DeleteBuffers(buffers);
+                ALHelper.CheckError("Failed to free one or more buffers.");
 
                 controller.FreeSource(this);
             }

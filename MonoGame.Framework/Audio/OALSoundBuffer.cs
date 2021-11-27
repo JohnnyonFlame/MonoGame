@@ -22,9 +22,35 @@ using OpenAL;
 
 namespace Microsoft.Xna.Framework.Audio
 {
+    internal class OALSoundBufferStreamed
+    {
+        public IntPtr dataBuffer {get; private set;}
+        public ALFormat format {get; private set;}
+        public int size {get; private set;}
+        public int sampleRate {get; private set;}
+        public AudioChannels channels {get; private set;}
+        public int alignment {get; private set;}
+
+        public OALSoundBufferStreamed()
+        {
+            dataBuffer = (IntPtr)null;
+        }
+        
+        public OALSoundBufferStreamed(IntPtr dataBuffer, ALFormat format, int size, int sampleRate, AudioChannels channels, int alignment = 0)
+        {
+            this.dataBuffer = dataBuffer;
+            this.format = format;
+            this.size = size;
+            this.sampleRate = sampleRate;
+            this.channels = channels;
+            this.alignment = alignment;
+        }
+    };
+
 	internal class OALSoundBuffer : IDisposable
 	{
 		int openALDataBuffer;
+        OALSoundBufferStreamed dataBufferStreamed; 
 		ALFormat openALFormat;
 		int dataSize;
 		int sampleRate;

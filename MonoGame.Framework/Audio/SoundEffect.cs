@@ -74,6 +74,20 @@ namespace Microsoft.Xna.Framework.Audio
             PlatformInitializeXact(codec, buffer, channels, sampleRate, blockAlignment, loopStart, loopLength, out _duration);
         }
 
+        // Only used from XACT WaveBank.
+        internal SoundEffect(MiniFormatTag codec, IntPtr buffer, long length, int channels, int sampleRate, int blockAlignment, int loopStart, int loopLength)
+        {
+            // Handle the common case... the rest is platform specific.
+            if (codec == MiniFormatTag.Pcm)
+            {
+                _duration = TimeSpan.FromSeconds((float)length / (sampleRate * blockAlignment));
+                PlatformInitializePcm(buffer, 0, (int)length, sampleRate, (AudioChannels)channels, loopStart, loopLength);
+                return;
+            }
+
+            PlatformInitializeXact(codec, buffer, length, channels, sampleRate, blockAlignment, loopStart, loopLength, out _duration);
+        }
+
         #endregion
 
         #region Public Constructors
@@ -301,14 +315,17 @@ namespace Microsoft.Xna.Framework.Audio
         /// </summary>
         internal SoundEffectInstance GetPooledInstance(bool forXAct)
         {
-            if (!SoundEffectInstancePool.SoundsAvailable)
-                return null;
+            lock (FrameworkDispatcher.updateWorkerThread)
+            {
+                if (!SoundEffectInstancePool.SoundsAvailable)
+                    return null;
 
-            var inst = SoundEffectInstancePool.GetInstance(forXAct);
-            inst._effect = this;
-            PlatformSetupInstance(inst);
+                var inst = SoundEffectInstancePool.GetInstance(forXAct);
+                inst._effect = this;
+                PlatformSetupInstance(inst);
 
-            return inst;
+                return inst;
+            }
         }
 
         #endregion
@@ -440,11 +457,14 @@ namespace Microsoft.Xna.Framework.Audio
         /// not at that time.  Unmanaged resources should always be released.</remarks>
         void Dispose(bool disposing)
         {
-            if (!_isDisposed)
+            lock (FrameworkDispatcher.updateWorkerThread)
             {
-                SoundEffectInstancePool.StopPooledInstances(this);
-                PlatformDispose(disposing);
-                _isDisposed = true;
+                if (!_isDisposed)
+                {
+                    SoundEffectInstancePool.StopPooledInstances(this);
+                    PlatformDispose(disposing);
+                    _isDisposed = true;
+                }
             }
         }
 

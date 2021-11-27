@@ -3,6 +3,7 @@
 // file 'LICENSE.txt', which is part of this source code package.
 
 using System;
+using System.Threading;
 using Microsoft.Xna.Framework.Audio;
 
 namespace Microsoft.Xna.Framework
@@ -17,6 +18,7 @@ namespace Microsoft.Xna.Framework
     public static class FrameworkDispatcher
     {
         private static bool _initialized = false;
+        public static Thread updateWorkerThread { get; private set; }
 
         /// <summary>
         /// Processes framework events.
@@ -26,7 +28,17 @@ namespace Microsoft.Xna.Framework
             if (!_initialized)
                 Initialize();
 
-            DoUpdate();
+            //DoUpdate();
+        }
+
+        private static void UpdateWork()
+        {
+            while (true) {
+                lock (updateWorkerThread) {
+                    DoUpdate();
+                }
+                Thread.Sleep(16);
+            }
         }
 
         private static void DoUpdate()
@@ -39,7 +51,8 @@ namespace Microsoft.Xna.Framework
         {
             // Initialize sound system
             SoundEffect.InitializeSoundEffect();
-
+            updateWorkerThread = new Thread(UpdateWork);
+            updateWorkerThread.Start();
             _initialized = true;
         }
     }

@@ -133,48 +133,59 @@ namespace Microsoft.Xna.Framework.Audio
         /// <remarks>Paused instances can be resumed with SoundEffectInstance.Play() or SoundEffectInstance.Resume().</remarks>
         public virtual void Pause()
         {
-            PlatformPause();
+            lock (FrameworkDispatcher.updateWorkerThread)
+            {
+                PlatformPause();
+            }
         }
 
         /// <summary>Plays or resumes a SoundEffectInstance.</summary>
         /// <remarks>Throws an exception if more sounds are playing than the platform allows.</remarks>
         public virtual void Play()
         {
-            if (_isDisposed)
-                throw new ObjectDisposedException("SoundEffectInstance");
+            lock (FrameworkDispatcher.updateWorkerThread) {
+                if (_isDisposed)
+                    throw new ObjectDisposedException("SoundEffectInstance");
 
-            if (State == SoundState.Playing)
-                return;
+                if (State == SoundState.Playing)
+                    return;
 
-            // We don't need to check if we're at the instance play limit
-            // if we're resuming from a paused state.
-            if (State != SoundState.Paused)
-            {
-                if (!SoundEffectInstancePool.SoundsAvailable)
-                    throw new InstancePlayLimitException();
+                // We don't need to check if we're at the instance play limit
+                // if we're resuming from a paused state.
+                if (State != SoundState.Paused)
+                {
+                    if (!SoundEffectInstancePool.SoundsAvailable)
+                        throw new InstancePlayLimitException();
 
-                SoundEffectInstancePool.Remove(this);
-            }
+                    SoundEffectInstancePool.Remove(this);
+                }
             
-            // For non-XAct sounds we need to be sure the latest
-            // master volume level is applied before playback.
-            if (!_isXAct)
-                PlatformSetVolume(_volume * SoundEffect.MasterVolume);
+                // For non-XAct sounds we need to be sure the latest
+                // master volume level is applied before playback.
+                if (!_isXAct)
+                    PlatformSetVolume(_volume * SoundEffect.MasterVolume);
 
-            PlatformPlay();
+                PlatformPlay();
+            }
         }
 
         /// <summary>Resumes playback for a SoundEffectInstance.</summary>
         /// <remarks>Only has effect on a SoundEffectInstance in a paused state.</remarks>
         public virtual void Resume()
         {
-            PlatformResume();
+            lock (FrameworkDispatcher.updateWorkerThread)
+            {
+                PlatformResume();
+            }
         }
 
         /// <summary>Immediately stops playing a SoundEffectInstance.</summary>
         public virtual void Stop()
         {
-            PlatformStop(true);
+            lock (FrameworkDispatcher.updateWorkerThread)
+            {
+                PlatformStop(true);
+            }
         }
 
         /// <summary>Stops playing a SoundEffectInstance, either immediately or as authored.</summary>
@@ -182,7 +193,10 @@ namespace Microsoft.Xna.Framework.Audio
         /// <remarks>Stopping a sound with the immediate argument set to false will allow it to play any release phases, such as fade, before coming to a stop.</remarks>
         public virtual void Stop(bool immediate)
         {
-            PlatformStop(immediate);
+            lock (FrameworkDispatcher.updateWorkerThread)
+            {
+                PlatformStop(immediate);
+            }
         }
 
         /// <summary>Releases the resources held by this <see cref="Microsoft.Xna.Framework.Audio.SoundEffectInstance"/>.</summary>

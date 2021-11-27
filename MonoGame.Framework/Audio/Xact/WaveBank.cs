@@ -4,6 +4,7 @@
 
 using System;
 using System.IO;
+using System.IO.MemoryMappedFiles;
 
 namespace Microsoft.Xna.Framework.Audio
 {
@@ -59,10 +60,17 @@ namespace Microsoft.Xna.Framework.Audio
         /// </summary>
         public bool IsPrepared { get; private set; }
 
+        private MemoryMappedFile BankMMap;
+
         /// <param name="audioEngine">Instance of the AudioEngine to associate this wave bank with.</param>
         /// <param name="nonStreamingWaveBankFilename">Path to the .xwb file to load.</param>
         /// <remarks>This constructor immediately loads all wave data into memory at once.</remarks>
-        public WaveBank(AudioEngine audioEngine, string nonStreamingWaveBankFilename)
+        public WaveBank(AudioEngine audioEngine, string nonStreamingWaveBankFilename): this(true, audioEngine, nonStreamingWaveBankFilename)
+        {
+
+        }
+
+        unsafe public WaveBank(bool stream, AudioEngine audioEngine, string nonStreamingWaveBankFilename)
         {
             if (audioEngine == null)
                 throw new ArgumentNullException("audioEngine");
@@ -88,7 +96,12 @@ namespace Microsoft.Xna.Framework.Audio
 
             int wavebank_offset = 0;
 
+            BankMMap = MemoryMappedFile.CreateFromFile(nonStreamingWaveBankFilename, FileMode.Open, nonStreamingWaveBankFilename, 0, MemoryMappedFileAccess.CopyOnWrite);
             BinaryReader reader = new BinaryReader(AudioEngine.OpenStream(nonStreamingWaveBankFilename));
+            var view = BankMMap.CreateViewAccessor();
+            byte *_ptr = null;
+            view.SafeMemoryMappedViewHandle.AcquirePointer(ref _ptr);
+            IntPtr ptr = (IntPtr)_ptr;
 
             reader.ReadBytes(4);
 
@@ -296,10 +309,10 @@ namespace Microsoft.Xna.Framework.Audio
                 }
                 
                 reader.BaseStream.Seek(wavebankentry.PlayRegion.Offset, SeekOrigin.Begin);
-                byte[] audiodata = reader.ReadBytes(wavebankentry.PlayRegion.Length);
+                reader.BaseStream.Seek(wavebankentry.PlayRegion.Length, SeekOrigin.Current);
 
                 // Call the special constuctor on SoundEffect to sort it out.
-                _sounds[current_entry] = new SoundEffect(codec, audiodata, chans, rate, align, wavebankentry.LoopRegion.Offset, wavebankentry.LoopRegion.Length);                
+                _sounds[current_entry] = new SoundEffect(codec, IntPtr.Add(ptr, wavebankentry.PlayRegion.Offset), wavebankentry.PlayRegion.Length, chans, rate, align, wavebankentry.LoopRegion.Offset, wavebankentry.LoopRegion.Length);                
             }
             
             audioEngine.Wavebanks[_bankName] = this;

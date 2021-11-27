@@ -31,6 +31,8 @@ namespace Microsoft.Xna.Framework.Audio
 
         internal OALSoundBuffer SoundBuffer;
 
+        internal OALSoundBufferStreamed SoundBufferStreamed;
+
         internal float Rate { get; set; }
 
         internal int Size { get; set; }
@@ -99,6 +101,42 @@ namespace Microsoft.Xna.Framework.Audio
             SoundBuffer.BindDataBuffer(buffer, Format, Size, (int)Rate);
         }
 
+        unsafe private void PlatformInitializePcm(IntPtr buffer, int offset, int count, int sampleRate, AudioChannels channels, int loopStart, int loopLength)
+        {
+            Rate = (float)sampleRate;
+            Size = (int)count;
+            Format = channels == AudioChannels.Stereo ? ALFormat.Stereo16 : ALFormat.Mono16;
+
+            // bind buffer
+            SoundBufferStreamed = new OALSoundBufferStreamed(buffer, Format, Size, (int)Rate, channels);
+        }
+
+        unsafe private void PlatformInitializeAdpcm (IntPtr buffer, int offset, int count, int sampleRate, AudioChannels channels, int dataFormat, int loopStart, int loopLength)
+        {
+            Rate = (float)sampleRate;
+            Size = (int)count;
+            #if DESKTOPGL
+            Format = channels == AudioChannels.Stereo ? ALFormat.StereoMSADPCM : ALFormat.MonoMSADPCM;
+            #else
+            Format = channels == AudioChannels.Stereo ? (ALFormat)0x1303 : (ALFormat)0x1302;
+            #endif
+
+            // bind buffer
+            SoundBufferStreamed = new OALSoundBufferStreamed(buffer, Format, Size, (int)Rate, channels, dataFormat);
+        }
+
+        private void PlatformInitializeXact(MiniFormatTag codec, IntPtr buffer, long length, int channels, int sampleRate, int blockAlignment, int loopStart, int loopLength, out TimeSpan duration)
+        {
+            if (codec == MiniFormatTag.Adpcm)
+            {
+                PlatformInitializeAdpcm(buffer, 0, (int)length, sampleRate, (AudioChannels)channels, (blockAlignment + 16) * 2, loopStart, loopLength);
+                //TODO:: find this size
+                //duration = TimeSpan.FromSeconds(SoundBufferStreamed.Duration);
+                return;
+            }
+
+            throw new NotSupportedException("Unsupported sound format!");
+        }
         private void PlatformInitializePcm(byte[] buffer, int offset, int count, int sampleRate, AudioChannels channels, int loopStart, int loopLength)
         {
             Rate = (float)sampleRate;
