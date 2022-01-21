@@ -17,6 +17,13 @@ public static class StardewPatches
 		new Harmony("com.github.johnnyonflame.StardewPatches").PatchAll(Assembly.GetExecutingAssembly());
 	}
 
+	private static float getScreenRatio()
+	{
+		float hratio = (float)Game1.game1.Window.ClientBounds.Height / 768f;
+		float wratio = (float)Game1.game1.Window.ClientBounds.Width / 1366f;
+		return (hratio < wratio) ? hratio : wratio;
+	}
+
 	[HarmonyPatch(typeof(Options))]
 	[HarmonyPatch("uiScale", MethodType.Getter)]
 	private class Options__get_desiredUIScale
@@ -24,10 +31,8 @@ public static class StardewPatches
 		// Fit UI to the screen.
 		private static void Postfix(ref float __result)
 		{
-			float hratio = (float)Game1.game1.Window.ClientBounds.Height / 768f;
-			float wratio = (float)Game1.game1.Window.ClientBounds.Width / 1366f;
-			float ratio = (hratio < wratio) ? hratio : wratio;
-			__result *= ratio;
+
+			__result *= getScreenRatio();
 		}
 	}
 
@@ -79,15 +84,14 @@ public static class StardewPatches
 	[HarmonyPatch("zoomLevel", MethodType.Getter)]
 	private class Options__zoomLevel_getter
 	{
-		// TODO:: Breaks on hidpi screens like rg552 - fix it.
 		private static bool Prefix(ref float __result, ref Options __instance)
 		{
 			if (Game1.game1.takingMapScreenshot)
 			{
-				__result = __instance.baseZoomLevel * 0.5f;
+				__result = __instance.baseZoomLevel * getScreenRatio();
 				return false;
 			}
-			__result = __instance.baseZoomLevel * 0.5f * Game1.game1.zoomModifier;
+			__result = __instance.baseZoomLevel * getScreenRatio() * Game1.game1.zoomModifier;
 			return false;
 		}
 	}
