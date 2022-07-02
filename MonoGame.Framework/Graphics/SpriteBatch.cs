@@ -61,6 +61,56 @@ namespace Microsoft.Xna.Framework.Graphics
             _beginCalled = false;
 		}
 
+        public void Begin ()
+		{
+            Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp, DepthStencilState.None, RasterizerState.CullCounterClockwise, null, Matrix.Identity);	
+		}
+
+        public void Begin
+        (
+             SpriteSortMode sortMode,
+             BlendState blendState,
+             SamplerState samplerState,
+             DepthStencilState depthStencilState,
+             RasterizerState rasterizerState,
+             Effect effect,
+             Matrix transformMatrix
+        )
+        {
+            if (_beginCalled)
+                throw new InvalidOperationException("Begin cannot be called again until End has been successfully called.");
+
+            // defaults
+            _sortMode = sortMode;
+            _blendState = blendState ?? BlendState.AlphaBlend;
+            _samplerState = samplerState ?? SamplerState.LinearClamp;
+            _depthStencilState = depthStencilState ?? DepthStencilState.None;
+            _rasterizerState = rasterizerState ?? RasterizerState.CullCounterClockwise;
+            _effect = effect;
+            _matrix = transformMatrix;
+
+            // Setup things now so a user can change them.
+            if (sortMode == SpriteSortMode.Immediate)
+            {
+                Setup();
+            }
+
+            _beginCalled = true;
+        }
+
+        // For windows version of Stardew Valley, ugh
+        public void Begin
+        (
+             SpriteSortMode sortMode = SpriteSortMode.Deferred,
+             BlendState blendState = null,
+             SamplerState samplerState = null,
+             DepthStencilState depthStencilState = null,
+             RasterizerState rasterizerState = null
+        )
+        {
+            Begin(sortMode, blendState, samplerState, depthStencilState, rasterizerState, null, null);
+        }
+
         /// <summary>
         /// Begins a new sprite and text batch with the specified render state.
         /// </summary>
