@@ -685,9 +685,10 @@ namespace Microsoft.Xna.Framework
 				Console.Out.WriteLine("Attempting to patch...");
                 var patchfile = Environment.GetEnvironmentVariable("MONOGAME_PATCH");
                 if (patchfile.Length > 0) {
-                    var assembly = Assembly.LoadFrom(patchfile);
+                    Assembly assembly = Assembly.LoadFrom(patchfile);
+                    Type modentry = assembly.GetType("ModEntryPointAttribute", true);
                     foreach (var type in assembly.GetTypes()
-                        .Where(t => Attribute.IsDefined(t, typeof(ModEntryPointAttribute))))
+                        .Where(t => Attribute.IsDefined(t, modentry)))
                     {
                         MethodInfo method = type.GetMethod("Main");
                         Console.Out.WriteLine("Attempting to use {0} (Main: {1})", type.ToString(), method.ToString());
