@@ -125,7 +125,7 @@ namespace Microsoft.Xna.Framework.Audio
         }
 
         const int MAX_BUFFERS = 5;
-        const long BUFFER_FILL_SZ = 16384;
+        const long BUFFER_FILL_SZ = 131072;
 
         private void PlayStreamed()
         {
