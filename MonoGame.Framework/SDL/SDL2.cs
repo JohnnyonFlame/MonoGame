@@ -11,9 +11,7 @@ internal static class Sdl
 {
     private const string NativeLibName = "SDL2.dll";
 
-    public static int Major;
-    public static int Minor;
-    public static int Patch;
+    public static Version version;
 
     private static unsafe string GetString(IntPtr handle)
     {
