@@ -104,7 +104,7 @@ namespace Microsoft.Xna.Framework
             _width = GraphicsDeviceManager.DefaultBackBufferWidth;
             _height = GraphicsDeviceManager.DefaultBackBufferHeight;
 
-            if (Sdl.Patch >= 4)
+            if (Sdl.version.Patch >= 4)
             {
                 var display = GetMouseDisplay();
                 _winx = display.X + display.Width / 2;
