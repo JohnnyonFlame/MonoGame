@@ -1,5 +1,5 @@
 // Compile with mcs, referencing the necessary assemblies e.g.:
-// mcs -target:library -reference:'StardewValley.exe' -reference:'MonoGame.Framework.dll' -reference:'0Harmony.dll' -optimize+ patches/StardewPatches.cs
+// mcs -target:library -reference:refs/StardewValley.exe -reference:refs/MonoGame.Framework.dll -reference:refs/0Harmony.dll -reference:refs/xTile.dll -optimize+ StardewPatches.cs -out:build/StardewPatches.dll
 
 using System;
 using System.Reflection;
@@ -8,6 +8,7 @@ using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Content;
 using StardewValley;
 using StardewValley.Menus;
 
@@ -325,6 +326,18 @@ public static class StardewPatches
 		private static bool Prefix(object sender, UnhandledExceptionEventArgs args)
 		{
 			Console.Out.WriteLine($"{((Exception)args.ExceptionObject).ToString()}");
+			return false;
+		}
+	}
+
+	[HarmonyPatch(typeof(LocalizedContentManager))]
+	[HarmonyPatch("GetContentRoot")]
+	private class LocalizedContentManager__GetContentRoot
+	{
+		private static bool Prefix(ref string __result)
+		{
+			ContentManager mgr = Game1.content;
+			__result = mgr.RootDirectory;
 			return false;
 		}
 	}
