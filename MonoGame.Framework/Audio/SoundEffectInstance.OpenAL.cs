@@ -276,6 +276,9 @@ namespace Microsoft.Xna.Framework.Audio
                 align = (int)stream.channels * bytesize * stream.alignment;
             }
 
+            if (align == 0)
+                align = 4;
+
             foreach (var buffer in buffers) {
                 long sz = BUFFER_FILL_SZ;
                 long left_in_stream = stream.size - currentBufferPosition;
